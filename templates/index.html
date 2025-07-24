@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>🏏 PCB Cricket Chatbot</title>
+  <!-- Google Fonts for sporty headings -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;700&family=Roboto&display=swap"
+    rel="stylesheet"
+  />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="header">
+    <div class="logo">🏏</div>
+    <h1>PCB Cricket Chatbot</h1>
+    <p>Your virtual cricket companion</p>
+  </header>
+
+  <main class="container">
+    <!-- About section -->
+    <section class="about">
+      <h2>About This Chatbot</h2>
+      <p>
+        Welcome to the PCB Cricket Chatbot! This interactive assistant lets you explore detailed career statistics
+        of Pakistan cricket players. Simply ask a question—either by typing or using the voice input feature—and get
+        instant, AI-powered responses based on a comprehensive PCB dataset.
+      </p>
+      <ul>
+        <li>⚡ Instant answers about Matches, Runs, Averages, and more.</li>
+        <li>🎤 Voice input &amp; voice output for hands-free interaction.</li>
+        <li>💾 Powered by a cached PCB dataset to ensure fast replies.</li>
+        <li>🔄 Your chat history is saved for easy reference.</li>
+      </ul>
+    </section>
+
+    <!-- Chat form -->
+    <form id="chat-form" method="POST">
+      <input
+        id="user_query"
+        type="text"
+        name="user_query"
+        placeholder="Ask about Pakistan cricket players…"
+        required
+        autofocus
+      />
+      <button type="button" id="mic-btn" title="Speak your query">🎤</button>
+      <button type="submit" id="send-btn">Send</button>
+    </form>
+
+    <!-- Chat window -->
+    <div class="chat-window">
+      {% for sender, text in chat_history %}
+        <div class="message {{ sender|lower }}">
+          <span class="sender">{{ sender }}:</span>
+          <span class="text">{{ text }}</span>
+        </div>
+      {% endfor %}
+    </div>
+  </main>
+
+  <!-- Voice I/O script (unchanged) -->
+  <script>
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      document.getElementById('mic-btn').style.display = 'none';
+    } else {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      const micBtn = document.getElementById('mic-btn');
+      const input  = document.getElementById('user_query');
+
+      micBtn.addEventListener('click', () => {
+        localStorage.setItem('voiceInput', 'true');
+        recognition.start();
+        micBtn.classList.add('listening');
+      });
+
+      recognition.addEventListener('result', (e) => {
+        input.value = e.results[0][0].transcript;
+      });
+
+      recognition.addEventListener('speechend', () => {
+        recognition.stop();
+        micBtn.classList.remove('listening');
+      });
+
+      recognition.addEventListener('error', (e) => {
+        console.error('Speech recognition error', e.error);
+        micBtn.classList.remove('listening');
+      });
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      if (localStorage.getItem('voiceInput') === 'true') {
+        const botMsgs = document.querySelectorAll('.message.bot .text');
+        if (botMsgs.length) {
+          const last = botMsgs[botMsgs.length - 1].textContent.trim();
+          const utter = new SpeechSynthesisUtterance(last);
+          speechSynthesis.speak(utter);
+        }
+        localStorage.removeItem('voiceInput');
+      }
+    });
+  </script>
+</body>
+</html>
