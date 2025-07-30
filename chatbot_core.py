@@ -9,6 +9,8 @@ genai.configure(api_key="AIzaSyCBbV_vzEqR1aqqZtdq6iXbukcPUm2o1u8")
 
 # --- In-memory storage for chat logs ---
 chat_logs = [] # Each entry: {"user_query": ..., "model_response": ..., "total_tokens": ...}
+last_user_query = None  # For follow-up context
+last_model_response = None
 
 # --- Load dataset table into an array of dicts ---
 def load_dataset():
@@ -45,11 +47,11 @@ def load_context():
         "Test Runs": "Test Runs",
         "ODI Runs": "ODI Runs",
         "T20 Runs": "T20 Runs",
-        "International Runs": "Total International Runs",
+        "International Runs": "Runs",
         "Maximum Score": "Highest Score",
         "Last Match Venue": "Last Match Venue",
         "Last Match Date": "Last Match Date",
-        "Runs in Last Match": "Runs in Last Match"
+        "Runs in Last Match": "Last Match Runs"
     }
     lines = []
     for _, row in df.iterrows():
@@ -78,13 +80,17 @@ def log_chat(user_query: str, model_response: str, total_tokens: int):
     """
     Logs a new question/answer pair along with token count into the chat_logs.
     """
+    global last_user_query, last_model_response
     chat_logs.append({
         "user_query": user_query,
         "model_response": model_response,
         "total_tokens": total_tokens
     })
+    last_user_query = user_query
+    last_model_response = model_response
 
 def answer_query(user_query: str) -> tuple[str, int]:
+    global last_user_query, last_model_response
     """
     Answers a user query about cricket players.
     First, it tries to retrieve a cached response.
@@ -98,9 +104,22 @@ def answer_query(user_query: str) -> tuple[str, int]:
         print("Returning cached response.")
         return cached, 0 # 0 tokens used for cached response
 
-    # 2) Otherwise, ask the Gemini model
-    answer = "I apologize, but I couldn't retrieve an answer at this time."
+    is_follow_up = any(word in user_query.lower() for word in ["more", "another", "next", "one more", "give me another"])
+    if is_follow_up and last_user_query and last_model_response:
+        followup_instruction = (
+            f"\nThis is a follow-up. Previous question:\n"
+            f"'{last_user_query}'\n"
+            f"Answer:\n'{last_model_response}'\n"
+            f"Now answer this:\n{user_query}"
+        )
+    else:
+        followup_instruction = f"Now answer this question:\n{user_query}"
+
+    answer = "I couldn't find an answer."
     total_tokens = 0
+    
+    # 2) Otherwise, ask the Gemini model
+   
 
     if not context_data or context_data == "No dataset available.":
         answer = "I cannot answer questions as the dataset could not be loaded."
@@ -118,7 +137,7 @@ def answer_query(user_query: str) -> tuple[str, int]:
             },
             {
                 "role": "user",
-                "parts": [{"text": f"Here is the dataset:\n\n{context_data}\n\nNow answer this question:\n{user_query}"}]
+                "parts": [{"text": f"Here is the dataset:\n\n{context_data}\n\nNow answer this question:\n{followup_instruction}"}]
             }
         ]
 
